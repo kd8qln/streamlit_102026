@@ -1,25 +1,25 @@
-# 🎈 Blank app template
+# Voyager Workbench
 
-A simple Streamlit app template for you to modify!
+A session-based Streamlit workbench for experiment development, formula
+development, batch calculations, and in-session table maintenance. Input and
+calculated data are kept in the current app session and can be exported as CSV.
+The interface does not write user-entered data or results to SQLite.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+## Run
 
-### How to run it on your own machine
+Install the project dependencies and start the app:
 
-Prerequisite: install `uv` if you don't already have it.
-
+```bash
+uv sync
+uv run streamlit run streamlit_app.py
 ```
-$ curl -LsSf https://astral.sh/uv/install.sh | sh
+
+Place an optional splash image named `splash.png` in the project root to customize
+the opening screen. In-session lookup table definitions and calculation logic are
+kept in `workbench.py`, separate from the Streamlit interface.
+
+## Test
+
+```bash
+uv run python -m unittest discover -s tests
 ```
-
-1. Sync the dependencies
-
-   ```
-   $ uv sync
-   ```
-
-2. Run the app
-
-   ```
-   $ uv run streamlit run streamlit_app.py
-   ```
