@@ -1,8 +1,11 @@
 # Voyager Workbench
 
-A session-based Streamlit workbench for experiment development, formula
-development, batch calculations, and in-session table maintenance. Input and
-calculated data are kept in the current app session and can be exported as CSV.
+A session-based Streamlit workbench for experiment development and design,
+formula development, batch calculations, and in-session table maintenance.
+Experiment Design estimates elemental composition bounds from averages and
+standard deviations, applies optional minimum and maximum constraints, and
+exports the adjusted results as CSV. Input and calculated data are kept in the
+current app session and can be exported as CSV.
 The interface does not write user-entered data or results to SQLite.
 
 ## Run

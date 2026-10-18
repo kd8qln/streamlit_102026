@@ -8,6 +8,7 @@ from calculator import OPERATIONS
 from workbench import (
     TABLE_DEFINITIONS,
     calculate_batch,
+    calculate_composition_ranges,
     calculate_experiment_summary,
     calculate_formula,
     records_to_csv,
@@ -31,6 +32,18 @@ def _initialize_session() -> None:
         "experiment_notes": "",
         "experiment_rows": [{"Measurement": "", "Value": None, "Unit": ""}],
         "experiment_summary": None,
+        "design_rows": [
+            {
+                "Element": "",
+                "Average (%)": None,
+                "Standard Deviation (%)": None,
+                "Minimum Constraint (%)": None,
+                "Maximum Constraint (%)": None,
+            }
+        ],
+        "design_standard_deviations": 1.0,
+        "design_results": None,
+        "design_results_standard_deviations": None,
         "formula_name": "",
         "formula_batch_size": 100.0,
         "formula_rows": [{"Component": "", "Percent": None}],
@@ -134,6 +147,98 @@ def _render_experiment_development() -> None:
         fields,
         "experiment_csv",
     )
+
+
+def _render_experiment_design() -> None:
+    st.title("Experiment Design")
+    st.write(
+        "Enter each element's average and standard deviation to estimate a "
+        "composition range. Optional minimum and maximum constraints narrow "
+        "that range."
+    )
+    standard_deviations = st.number_input(
+        "Number of standard deviations",
+        min_value=0.0,
+        step=0.01,
+        format="%.2f",
+        key="design_standard_deviations",
+    )
+    if st.session_state["design_results_standard_deviations"] != standard_deviations:
+        st.session_state["design_results"] = None
+    st.subheader("Element inputs")
+    previous_rows = st.session_state["design_rows"]
+    edited = st.data_editor(
+        previous_rows,
+        key="design_editor",
+        num_rows="dynamic",
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Element": st.column_config.TextColumn("Element"),
+            "Average (%)": st.column_config.NumberColumn(
+                "Average (%)", min_value=0.0, max_value=100.0, step=0.000001,
+                format="%.6f",
+            ),
+            "Standard Deviation (%)": st.column_config.NumberColumn(
+                "Standard Deviation (%)", min_value=0.0, step=0.000001,
+                format="%.6f",
+            ),
+            "Minimum Constraint (%)": st.column_config.NumberColumn(
+                "Minimum Constraint (%)", min_value=0.0, max_value=100.0,
+                step=0.000001, format="%.6f",
+            ),
+            "Maximum Constraint (%)": st.column_config.NumberColumn(
+                "Maximum Constraint (%)", min_value=0.0, max_value=100.0,
+                step=0.000001, format="%.6f",
+            ),
+        },
+    )
+    current_rows = _as_records(edited)
+    if current_rows != previous_rows:
+        st.session_state["design_results"] = None
+    st.session_state["design_rows"] = current_rows
+
+    if st.button("Calculate ranges", type="primary", key="design_calculate"):
+        try:
+            st.session_state["design_results"] = calculate_composition_ranges(
+                current_rows, standard_deviations
+            )
+            st.session_state["design_results_standard_deviations"] = (
+                standard_deviations
+            )
+        except ValueError as error:
+            st.session_state["design_results"] = None
+            st.session_state["design_results_standard_deviations"] = None
+            st.error(str(error))
+
+    results = st.session_state["design_results"]
+    if results:
+        st.subheader("Compositional ranges")
+        st.dataframe(results, hide_index=True, width="stretch")
+        if any(row["Status"] == "No overlap" for row in results):
+            st.warning(
+                "One or more constraints do not overlap the estimated range. "
+                "Review those bounds before using them in an experiment."
+            )
+    if results:
+        _download_csv(
+            "Download adjusted bounds CSV",
+            "experiment_design.csv",
+            results,
+            [
+                "Element",
+                "Average (%)",
+                "Standard Deviation (%)",
+                "Calculated Minimum (%)",
+                "Calculated Maximum (%)",
+                "Minimum Constraint (%)",
+                "Maximum Constraint (%)",
+                "Adjusted Minimum (%)",
+                "Adjusted Maximum (%)",
+                "Status",
+            ],
+            "design_csv",
+        )
 
 
 def _render_formula_development() -> None:
@@ -278,6 +383,7 @@ _initialize_session()
 screens = [
     "Splashscreen",
     "Experiment Development",
+    "Experiment Design",
     "Formula Development",
     "Calculators",
     "Table Maintenance",
@@ -288,6 +394,7 @@ st.sidebar.caption("Working data is held for this session.")
 renderers = {
     "Splashscreen": _render_splashscreen,
     "Experiment Development": _render_experiment_development,
+    "Experiment Design": _render_experiment_design,
     "Formula Development": _render_formula_development,
     "Calculators": _render_calculators,
     "Table Maintenance": _render_table_maintenance,

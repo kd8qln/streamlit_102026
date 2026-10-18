@@ -71,6 +71,111 @@ def calculate_experiment_summary(
     }
 
 
+def calculate_composition_ranges(
+    elements: list[dict[str, Any]], standard_deviations: float
+) -> list[dict[str, Any]]:
+    if not math.isfinite(standard_deviations) or standard_deviations < 0:
+        raise ValueError("Number of standard deviations must be a finite non-negative number")
+
+    results = []
+    for row_number, row in enumerate(elements, start=1):
+        element = row.get("Element")
+        average = row.get("Average (%)")
+        deviation = row.get("Standard Deviation (%)")
+        minimum_constraint = row.get("Minimum Constraint (%)")
+        maximum_constraint = row.get("Maximum Constraint (%)")
+        if all(
+            _is_blank(value)
+            for value in (
+                element,
+                average,
+                deviation,
+                minimum_constraint,
+                maximum_constraint,
+            )
+        ):
+            continue
+
+        if _is_blank(element):
+            raise ValueError(f"Enter an element for row {row_number}")
+        if _is_blank(average) or _is_blank(deviation):
+            raise ValueError(f"Enter both average and standard deviation for {element}")
+
+        average_value = _parse_percentage(average, f"Average for {element}")
+        deviation_value = _parse_number(deviation, f"Standard deviation for {element}")
+        if deviation_value < 0:
+            raise ValueError(f"Standard deviation for {element} must be non-negative")
+
+        calculated_minimum = average_value - standard_deviations * deviation_value
+        calculated_maximum = average_value + standard_deviations * deviation_value
+        minimum_value = (
+            _parse_percentage(minimum_constraint, f"Minimum constraint for {element}")
+            if not _is_blank(minimum_constraint)
+            else None
+        )
+        maximum_value = (
+            _parse_percentage(maximum_constraint, f"Maximum constraint for {element}")
+            if not _is_blank(maximum_constraint)
+            else None
+        )
+        if (
+            minimum_value is not None
+            and maximum_value is not None
+            and minimum_value > maximum_value
+        ):
+            raise ValueError(f"Minimum constraint exceeds maximum constraint for {element}")
+
+        adjusted_minimum = max(
+            calculated_minimum,
+            minimum_value if minimum_value is not None else calculated_minimum,
+        )
+        adjusted_maximum = min(
+            calculated_maximum,
+            maximum_value if maximum_value is not None else calculated_maximum,
+        )
+        if adjusted_minimum > adjusted_maximum:
+            status = "No overlap"
+        elif adjusted_minimum != calculated_minimum or adjusted_maximum != calculated_maximum:
+            status = "Adjusted by constraints"
+        else:
+            status = "OK"
+
+        results.append(
+            {
+                "Element": str(element).strip(),
+                "Average (%)": average_value,
+                "Standard Deviation (%)": deviation_value,
+                "Calculated Minimum (%)": calculated_minimum,
+                "Calculated Maximum (%)": calculated_maximum,
+                "Minimum Constraint (%)": minimum_value,
+                "Maximum Constraint (%)": maximum_value,
+                "Adjusted Minimum (%)": adjusted_minimum,
+                "Adjusted Maximum (%)": adjusted_maximum,
+                "Status": status,
+            }
+        )
+    if not results:
+        raise ValueError("Enter at least one element")
+    return results
+
+
+def _parse_number(value: Any, label: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{label} must be numeric") from error
+    if not math.isfinite(number):
+        raise ValueError(f"{label} must be a finite number")
+    return number
+
+
+def _parse_percentage(value: Any, label: str) -> float:
+    number = _parse_number(value, label)
+    if not 0 <= number <= 100:
+        raise ValueError(f"{label} must be between 0 and 100")
+    return number
+
+
 def calculate_formula(
     batch_size: float, components: list[dict[str, Any]]
 ) -> tuple[float, list[dict[str, Any]]]:
